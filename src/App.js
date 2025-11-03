@@ -1,20 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle, XCircle, ArrowRight, Share2, Github, MessageCircle, Moon, Sun, Instagram, Copy, Check } from 'lucide-react';
+import { Analytics } from "@vercel/analytics/react"
 
 const mythsData = [
   {
     id: 1,
-    statement: "<b> and <strong> are the same element.",
+    statement: "The <title> element only affects what's shown in the browser tab.",
     correct: false,
-    explanation: "<strong> adds semantic importance for screen readers and search engines, while <b> is purely visual styling without semantic meaning.",
-    link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/strong"
+    explanation: "The <title> element also provides important metadata for bookmarks, search engine results, and screen readers. It's one of the simplest and most important elements for accessibility and SEO — every HTML document should include one.",
+    link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/title"
   },
   {
     id: 2,
-    statement: "<i> and <em> both just italicize text.",
+    statement: "<small> makes text look smaller, so it's only for styling.",
     correct: false,
-    explanation: "<em> gives emphasis that's recognized by assistive technologies, while <i> is visual-only italicization without semantic weight.",
-    link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/em"
+    explanation: "The <small> element does make text appear smaller by default, but it also has semantic meaning — it represents side comments, disclaimers, or fine print. If you only want smaller text visually, you should use CSS instead of <small> for proper separation of style and meaning.",
+    link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/small"
   },
   {
     id: 3,
@@ -32,10 +33,10 @@ const mythsData = [
   },
   {
     id: 5,
-    statement: "CSS classes are better than inline styles for maintainability.",
+    statement: "You can make a <div> or <span> act like a <button> with enough code.",
     correct: true,
-    explanation: "Correct! CSS classes separate presentation from content, making your code easier to maintain, update, and reuse across multiple elements.",
-    link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/style"
+    explanation: "With JavaScript, you can make a <div> or <span> behave like a button — you can add click handlers, manage focus, and handle keyboard input manually. But that's reinventing the wheel. The native <button> element already provides all this for free: It's keyboard-accessible by default. It automatically exposes its role and state to assistive technologies. It supports form behavior and focus management out of the box. So yes — you can fake a button with a <div>, but you really shouldn't.",
+    link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/button"
   },
   {
     id: 6,
@@ -48,14 +49,14 @@ const mythsData = [
     id: 7,
     statement: "<!DOCTYPE html> is required for standards mode.",
     correct: true,
-    explanation: "Correct! The DOCTYPE declaration triggers standards mode in browsers, ensuring consistent rendering across different browsers.",
+    explanation: "The DOCTYPE declaration triggers standards mode in browsers, ensuring consistent rendering across different browsers.",
     link: "https://developer.mozilla.org/en-US/docs/Glossary/Doctype"
   },
   {
     id: 8,
-    statement: "The <center> tag is valid HTML.",
+    statement: "The <center> element is valid HTML.",
     correct: false,
-    explanation: "<center> has been deprecated since HTML 4. Use CSS (text-align: center or flexbox/grid) for centering content instead.",
+    explanation: "<center> has been deprecated since HTML 4. Use CSS (text-align: center, flexbox, or grid) for centering content instead.",
     link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Element#obsolete_and_deprecated_elements"
   },
   {
@@ -67,16 +68,16 @@ const mythsData = [
   },
   {
     id: 10,
-    statement: "Void elements like <img> don't need a closing slash in HTML5.",
-    correct: true,
-    explanation: "Correct! In HTML5, void elements don't require a closing slash. While <img /> is valid, <img> works just fine.",
+    statement: "Self-closing HTML elements like <img /> need a closing slash.",
+    correct: false,
+    explanation: "In the HTML spec there's no such thing as a closing slash. There's only a list of self-closing elements that don't need a closing tag. All modern HTML browser parsers just ignore this slash. Some templating engines like JSX require them, but only because JSX only looks like HTML, but it's not: see className and </> fragments. Some formatters, like Prettier, insert them by default, but this is just a stylistic preference with no actual use in browsers.",
     link: "https://developer.mozilla.org/en-US/docs/Glossary/Void_element"
   },
   {
     id: 11,
-    statement: "HTML5 allows multiple <h1> elements per page.",
-    correct: true,
-    explanation: "Correct! HTML5 allows multiple <h1> elements, especially within different sectioning elements like <article> or <section>.",
+    statement: "HTML allows multiple <h1> elements per page.",
+    correct: false,
+    explanation: "HTML allows only a single <h1> per page, and it's better for accessibility and SEO. In early HTML versions there was an idea called \"outline algorithm\" that would allow using <h1> as the only heading element, and the heading level would be determined by the nesting into sectioning elements like <article> or <section>. No browser has ever implemented this, and it has been removed from the spec, but the myth lives on.",
     link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Heading_Elements"
   },
   {
@@ -95,9 +96,9 @@ const mythsData = [
   },
   {
     id: 14,
-    statement: "In HTML5, <a> elements can wrap block-level content.",
+    statement: "In HTML, <a> elements can wrap block-level content.",
     correct: true,
-    explanation: "Correct! HTML5 allows anchor elements to wrap block-level content, making entire cards or sections clickable.",
+    explanation: "HTML allows anchor elements to wrap block-level content, making entire cards or sections clickable.",
     link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/a"
   },
   {
@@ -105,7 +106,7 @@ const mythsData = [
     statement: "HTML comments improve SEO.",
     correct: false,
     explanation: "HTML comments are completely ignored by browsers and search engine crawlers. They won't help or hurt your SEO.",
-    link: "https://developer.mozilla.org/en-US/docs/Web/HTML/Comment_tags"
+    link: "https://developer.mozilla.org/en-US/docs/Learn/HTML/Introduction_to_HTML/Getting_started#html_comments"
   }
 ];
 
@@ -150,6 +151,37 @@ export default function HTMLMythsQuiz() {
     localStorage.setItem('darkMode', darkMode.toString());
   }, [darkMode]);
 
+  // Track quiz abandonment
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Only track abandonment if quiz is in progress
+      if (stage === 'quiz' && currentIndex < myths.length - 1) {
+        trackEvent('quiz_abandoned', {
+          questionNumber: currentIndex + 1,
+          questionsAnswered: answers.length,
+          totalQuestions: myths.length,
+          progress: Math.round(((currentIndex + 1) / myths.length) * 100),
+          timestamp: new Date().toISOString()
+        });
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [stage, currentIndex, myths.length, answers.length]);
+
+  // Track page views for funnel analysis
+  useEffect(() => {
+    if (stage === 'intro') {
+      trackEvent('page_viewed', { page: 'intro' });
+    } else if (stage === 'outro') {
+      trackEvent('page_viewed', { page: 'outro' });
+    }
+  }, [stage]);
+
   const score = answers.filter((a, i) => a === myths[i]?.correct).length;
 
   const handleAnswer = (userAnswer) => {
@@ -177,6 +209,12 @@ export default function HTMLMythsQuiz() {
       setRevealed(false);
       if (currentIndex < myths.length - 1) {
         setCurrentIndex(currentIndex + 1);
+        // Track next question view
+        trackEvent('question_viewed', {
+          questionNumber: currentIndex + 2,
+          totalQuestions: myths.length,
+          progress: Math.round(((currentIndex + 2) / myths.length) * 100)
+        });
       } else {
         const totalQuestions = myths.length;
         const finalScore = answers.filter((a, i) => a === myths[i]?.correct).length;
@@ -184,7 +222,8 @@ export default function HTMLMythsQuiz() {
         trackEvent('quiz_completed', {
           score: finalScore,
           totalQuestions: totalQuestions,
-          percentage: Math.round((finalScore / totalQuestions) * 100)
+          percentage: Math.round((finalScore / totalQuestions) * 100),
+          timestamp: new Date().toISOString()
         });
       }
       setAnimating(false);
@@ -197,7 +236,14 @@ export default function HTMLMythsQuiz() {
     setCurrentIndex(0);
     setAnswers([]);
     setRevealed(false);
-    trackEvent('quiz_started');
+    trackEvent('quiz_started', {
+      timestamp: new Date().toISOString()
+    });
+    // Track first question view
+    trackEvent('question_viewed', {
+      questionNumber: 1,
+      totalQuestions: 15
+    });
   };
 
   const restartQuiz = () => {
@@ -245,7 +291,7 @@ export default function HTMLMythsQuiz() {
     let loadedImages = 0;
 
     const drawContent = () => {
-      // Draw MDN logo
+      // Draw MDN logo (use dark version for Instagram as background is dark)
       const mdnWidth = 200;
       const mdnHeight = (mdnLogo.height / mdnLogo.width) * mdnWidth;
       ctx.drawImage(mdnLogo, 300, 100, mdnWidth, mdnHeight);
@@ -293,6 +339,11 @@ export default function HTMLMythsQuiz() {
       ctx.font = '48px Arial';
       ctx.fillText('Can you beat my score?', 540, 1450);
 
+      // Quiz website
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '48px Arial';
+      ctx.fillText('Try it out → mozfest.pran.sh', 540, 1450);
+
       // MDN branding
       ctx.font = '36px Arial';
       ctx.fillText('developer.mozilla.org', 540, 1750);
@@ -329,8 +380,9 @@ export default function HTMLMythsQuiz() {
       if (loadedImages === 2) drawContent();
     };
 
-    mdnLogo.src = '/mdn-logo.svg';
-    mozfestLogo.src = '/mozfest-logo.svg';
+    // Use dark version of MDN logo for Instagram (dark background)
+    mdnLogo.src = '/mdn-logo-dark.svg';
+    mozfestLogo.src = '/mozfest-logo.png';
   };
 
   // Intro Stage
@@ -354,7 +406,7 @@ export default function HTMLMythsQuiz() {
           <div className="flex justify-center items-center gap-8 mb-8 pb-6 border-b border-gray-200 dark:border-gray-700">
             <div className="text-center">
               <img 
-                src="/mdn-logo.svg" 
+                src={darkMode ? "/mdn-logo-dark.svg" : "/mdn-logo-light.svg"}
                 alt="MDN Web Docs" 
                 className="h-16 w-auto"
                 onError={(e) => {
@@ -369,7 +421,7 @@ export default function HTMLMythsQuiz() {
             <div className="text-2xl font-bold text-gray-400">×</div>
             <div className="text-center">
               <img 
-                src="/mozfest-logo.svg" 
+                src="/mozfest-logo.png" 
                 alt="MozFest" 
                 className="h-16 w-auto"
                 onError={(e) => {
@@ -385,10 +437,10 @@ export default function HTMLMythsQuiz() {
 
           <div className="text-center">
             <h1 className={`text-4xl md:text-5xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
-              Unlearning HTML Myths
+              🧩 Unlearning HTML Myths
             </h1>
             <p className={`text-xl ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-8`}>
-              7-9 Nov, 2025 • Barcelona, Spain 🇪🇸
+              MDN x MozFest 2025 • Barcelona
             </p>
             
             <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-50'} rounded-xl p-6 mb-8 text-left transition-colors duration-300`}>
@@ -451,7 +503,7 @@ export default function HTMLMythsQuiz() {
           <div className="flex justify-center items-center gap-6 mb-4">
             <div className="text-center">
               <img 
-                src="/mdn-logo.svg" 
+                src={darkMode ? "/mdn-logo-dark.svg" : "/mdn-logo-light.svg"}
                 alt="MDN Web Docs" 
                 className="h-12 w-auto"
                 onError={(e) => {
@@ -462,7 +514,7 @@ export default function HTMLMythsQuiz() {
             <div className="text-xl font-bold text-gray-400">×</div>
             <div className="text-center">
               <img 
-                src="/mozfest-logo.svg" 
+                src="/mozfest-logo.png" 
                 alt="MozFest" 
                 className="h-12 w-auto"
                 onError={(e) => {
@@ -598,7 +650,7 @@ export default function HTMLMythsQuiz() {
           <div className="flex justify-center items-center gap-8 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
             <div className="text-center">
               <img 
-                src="/mdn-logo.svg" 
+                src="/mdn-logo-light.svg" 
                 alt="MDN Web Docs" 
                 className="h-16 w-auto"
                 onError={(e) => {
@@ -613,7 +665,7 @@ export default function HTMLMythsQuiz() {
             <div className="text-2xl font-bold text-gray-400">×</div>
             <div className="text-center">
               <img 
-                src="/mozfest-logo.svg" 
+                src="/mozfest-logo.png" 
                 alt="MozFest" 
                 className="h-16 w-auto"
                 onError={(e) => {
@@ -727,13 +779,6 @@ export default function HTMLMythsQuiz() {
                     <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
                       <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.039.415-.056-.138.022-.276.04-.415.056-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 0 1-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.79.624-6.478 0-.69-.139-1.861-.902-2.206-.659-.298-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8Z"/>
-                      </svg>
-                    </div>
-                    
-                    {/* Threads */}
-                    <div className={`w-12 h-12 ${darkMode ? 'bg-gray-600' : 'bg-gray-900'} rounded-full flex items-center justify-center`}>
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.742-1.75-.501-.569-1.253-.859-2.233-.859-1.31 0-2.272.537-2.914 1.627l-1.8-.859C10.716 5.08 12.333 4 14.585 4c1.553 0 2.788.542 3.668 1.609 1.017 1.232 1.545 3.013 1.545 5.242v.093c.003.031.007.062.01.093.745.385 1.328.925 1.737 1.6.916 1.513.978 3.432-.114 5.705-.966 2.01-2.793 3.34-5.45 3.975-1.031.246-2.124.369-3.248.37l-.034-.002Z"/>
                       </svg>
                     </div>
                   </div>
