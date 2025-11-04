@@ -136,13 +136,13 @@ export default function HTMLMythsQuiz() {
   const canvasRef = useRef(null);
 
   // Track analytics events
-  const trackEvent = (eventName, properties = {}) => {
-    // Vercel Analytics tracking
-    if (typeof window !== 'undefined' && window.va) {
-      window.va('track', eventName, properties);
-    }
-    console.log('Analytics Event:', eventName, properties);
-  };
+const trackEvent = (eventName, properties = {}) => {
+  // Plausible Analytics tracking
+  if (typeof window !== 'undefined' && window.plausible) {
+    window.plausible(eventName, { props: properties });
+  }
+  console.log('Analytics Event:', eventName, properties);
+};
 
   // Initialize dark mode from localStorage
   useEffect(() => {
