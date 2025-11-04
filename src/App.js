@@ -1,10 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle, XCircle, ArrowRight, Share2, Github, MessageCircle, Moon, Sun, Instagram, Copy, Check } from 'lucide-react';
-import { init } from '@plausible-analytics/tracker'
-
-init({
-  domain: 'mozfest.pran.sh'
-})
 
 const mythsData = [
   {
@@ -136,13 +131,13 @@ export default function HTMLMythsQuiz() {
   const canvasRef = useRef(null);
 
   // Track analytics events
-const trackEvent = (eventName, properties = {}) => {
-  // Plausible Analytics tracking
-  if (typeof window !== 'undefined' && window.plausible) {
-    window.plausible(eventName, { props: properties });
-  }
-  console.log('Analytics Event:', eventName, properties);
-};
+  const trackEvent = (eventName, properties = {}) => {
+    // Vercel Analytics tracking
+    if (typeof window !== 'undefined' && window.va) {
+      window.va('track', eventName, properties);
+    }
+    console.log('Analytics Event:', eventName, properties);
+  };
 
   // Initialize dark mode from localStorage
   useEffect(() => {
@@ -213,12 +208,23 @@ const trackEvent = (eventName, properties = {}) => {
       setRevealed(false);
       if (currentIndex < myths.length - 1) {
         setCurrentIndex(currentIndex + 1);
+        const nextQuestion = currentIndex + 2;
+        
         // Track next question view
         trackEvent('question_viewed', {
-          questionNumber: currentIndex + 2,
+          questionNumber: nextQuestion,
           totalQuestions: myths.length,
-          progress: Math.round(((currentIndex + 2) / myths.length) * 100)
+          progress: Math.round((nextQuestion / myths.length) * 100)
         });
+        
+        // Track milestone questions for funnel analysis
+        if (nextQuestion === 5) {
+          trackEvent('question_5_reached');
+        } else if (nextQuestion === 10) {
+          trackEvent('question_10_reached');
+        } else if (nextQuestion === 15) {
+          trackEvent('question_15_reached');
+        }
       } else {
         const totalQuestions = myths.length;
         const finalScore = answers.filter((a, i) => a === myths[i]?.correct).length;
@@ -248,6 +254,21 @@ const trackEvent = (eventName, properties = {}) => {
       questionNumber: 1,
       totalQuestions: 15
     });
+    // Track milestone for funnel
+    trackEvent('question_1_reached');
+  };
+
+  const endQuizEarly = () => {
+    const finalScore = answers.filter((a, i) => a === myths[i]?.correct).length;
+    setStage('outro');
+    trackEvent('quiz_ended_early', {
+      questionNumber: currentIndex + 1,
+      questionsAnswered: answers.length,
+      totalQuestions: myths.length,
+      score: finalScore,
+      progress: Math.round(((currentIndex + 1) / myths.length) * 100),
+      timestamp: new Date().toISOString()
+    });
   };
 
   const restartQuiz = () => {
@@ -261,8 +282,13 @@ const trackEvent = (eventName, properties = {}) => {
 
   // Generate share text
   const getShareText = () => {
+    const questionsAnswered = answers.length;
     const totalQuestions = myths.length || 15;
-    const percentage = Math.round((score / totalQuestions) * 100);
+    const percentage = questionsAnswered > 0 ? Math.round((score / questionsAnswered) * 100) : 0;
+    
+    if (questionsAnswered < totalQuestions) {
+      return `I scored ${score}/${questionsAnswered} (${percentage}%) on the "Unlearning HTML Myths" quiz at MDN x MozFest! 🧩`;
+    }
     return `I scored ${score}/${totalQuestions} (${percentage}%) on the "Unlearning HTML Myths" quiz at MDN x MozFest! 🧩 Can you beat my score?`;
   };
 
@@ -328,29 +354,33 @@ const trackEvent = (eventName, properties = {}) => {
       ctx.fill();
 
       // Score text
+      const questionsAnswered = answers.length;
       const totalQuestions = myths.length || 15;
       ctx.fillStyle = '#1e3a8a';
       ctx.font = 'bold 120px Arial';
-      ctx.fillText(`${score}/${totalQuestions}`, 540, 900);
+      ctx.fillText(`${score}/${questionsAnswered}`, 540, 900);
 
       // Percentage
-      const percentage = Math.round((score / totalQuestions) * 100);
+      const percentage = questionsAnswered > 0 ? Math.round((score / questionsAnswered) * 100) : 0;
       ctx.font = 'bold 72px Arial';
       ctx.fillText(`${percentage}%`, 540, 1000);
 
       // Call to action
       ctx.fillStyle = '#ffffff';
       ctx.font = '48px Arial';
-      ctx.fillText('Can you beat my score?', 540, 1450);
+      if (questionsAnswered < totalQuestions) {
+        ctx.fillText(`${questionsAnswered}/${totalQuestions} questions`, 540, 1450);
+      } else {
+        ctx.fillText('Can you beat my score?', 540, 1450);
+      }
 
-      // Quiz website
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '48px Arial';
-      ctx.fillText('Try it out → mozfest.pran.sh', 540, 1450);
+      // Quiz link
+      ctx.font = '36px Arial';
+      ctx.fillText('Try it out → mozfest.pran.sh', 540, 1500);
 
       // MDN branding
       ctx.font = '36px Arial';
-      ctx.fillText('developer.mozilla.org', 540, 1750);
+      ctx.fillText('developer.mozilla.org', 540, 1850);
 
       // Convert to blob and download
       canvas.toBlob((blob) => {
@@ -405,35 +435,43 @@ const trackEvent = (eventName, properties = {}) => {
           {darkMode ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
         </button>
 
+        {/* End Quiz Button */}
+        <button
+          onClick={endQuizEarly}
+          className={`fixed top-4 left-4 ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-white text-gray-700 hover:bg-gray-100'} px-4 py-2 rounded-lg shadow-lg transition-all text-sm font-medium z-50`}
+        >
+          End Quiz
+        </button>
+
         <div className={`max-w-2xl w-full ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-2xl p-8 md:p-12 transition-colors duration-300`}>
           {/* Logo Space */}
-          <div className="flex justify-center items-center gap-8 mb-8 pb-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex justify-center items-center gap-4 sm:gap-8 mb-8 pb-6 border-b border-gray-200 dark:border-gray-700">
             <div className="text-center">
               <img 
                 src={darkMode ? "/mdn-logo-dark.svg" : "/mdn-logo-light.svg"}
                 alt="MDN Web Docs" 
-                className="h-16 w-auto"
+                className="h-10 sm:h-16 w-auto"
                 onError={(e) => {
                   e.target.style.display = 'none';
                   e.target.nextElementSibling.style.display = 'flex';
                 }}
               />
-              <div className={`w-32 h-16 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg hidden items-center justify-center text-xs font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <div className={`w-24 sm:w-32 h-10 sm:h-16 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg hidden items-center justify-center text-xs font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 MDN Logo
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-400">×</div>
+            <div className="text-lg sm:text-2xl font-bold text-gray-400">×</div>
             <div className="text-center">
               <img 
                 src="/mozfest-logo.png" 
                 alt="MozFest" 
-                className="h-16 w-auto"
+                className="h-10 sm:h-16 w-auto"
                 onError={(e) => {
                   e.target.style.display = 'none';
                   e.target.nextElementSibling.style.display = 'flex';
                 }}
               />
-              <div className={`w-32 h-16 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg hidden items-center justify-center text-xs font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <div className={`w-24 sm:w-32 h-10 sm:h-16 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg hidden items-center justify-center text-xs font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 MozFest Logo
               </div>
             </div>
@@ -504,23 +542,23 @@ const trackEvent = (eventName, properties = {}) => {
 
         <div className="max-w-2xl w-full">
           {/* Logo Space */}
-          <div className="flex justify-center items-center gap-6 mb-4">
+          <div className="flex justify-center items-center gap-4 sm:gap-6 mb-4">
             <div className="text-center">
               <img 
                 src={darkMode ? "/mdn-logo-dark.svg" : "/mdn-logo-light.svg"}
                 alt="MDN Web Docs" 
-                className="h-12 w-auto"
+                className="h-8 sm:h-12 w-auto"
                 onError={(e) => {
                   e.target.style.display = 'none';
                 }}
               />
             </div>
-            <div className="text-xl font-bold text-gray-400">×</div>
+            <div className="text-lg sm:text-xl font-bold text-gray-400">×</div>
             <div className="text-center">
               <img 
                 src="/mozfest-logo.png" 
                 alt="MozFest" 
-                className="h-12 w-auto"
+                className="h-8 sm:h-12 w-auto"
                 onError={(e) => {
                   e.target.style.display = 'none';
                 }}
@@ -630,8 +668,9 @@ const trackEvent = (eventName, properties = {}) => {
 
   // Outro Stage
   if (stage === 'outro') {
+    const questionsAnswered = answers.length;
     const totalQuestions = myths.length || 15;
-    const percentage = Math.round((score / totalQuestions) * 100);
+    const percentage = questionsAnswered > 0 ? Math.round((score / questionsAnswered) * 100) : 0;
     const shareText = getShareText();
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
     
@@ -654,7 +693,7 @@ const trackEvent = (eventName, properties = {}) => {
           <div className="flex justify-center items-center gap-8 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
             <div className="text-center">
               <img 
-                src="/mdn-logo-light.svg" 
+                src={darkMode ? "/mdn-logo-dark.svg" : "/mdn-logo-light.svg"}
                 alt="MDN Web Docs" 
                 className="h-16 w-auto"
                 onError={(e) => {
@@ -690,8 +729,13 @@ const trackEvent = (eventName, properties = {}) => {
             
             {/* Score */}
             <div className="bg-gradient-to-r from-blue-600 to-orange-500 text-white rounded-2xl p-8 mb-8">
-              <div className="text-6xl font-bold mb-2">{score}/{totalQuestions}</div>
+              <div className="text-6xl font-bold mb-2">{score}/{questionsAnswered}</div>
               <div className="text-2xl">{percentage}% Correct</div>
+              {questionsAnswered < totalQuestions && (
+                <div className="text-sm mt-3 opacity-90">
+                  You answered {questionsAnswered} out of {totalQuestions} questions
+                </div>
+              )}
             </div>
 
             <div className="space-y-6 text-left mb-8">
