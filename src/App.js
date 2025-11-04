@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle, XCircle, ArrowRight, Share2, Github, MessageCircle, Moon, Sun, Instagram, Copy, Check } from 'lucide-react';
-import { Analytics } from "@vercel/analytics/react"
+import { init } from '@plausible-analytics/tracker'
+
+init({
+  domain: 'mozfest.pran.sh'
+})
 
 const mythsData = [
   {
